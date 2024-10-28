@@ -62,6 +62,16 @@ int processInput(std::string &inputArgs, std::vector<std::string> &parsedArgs){
     return 1;
 }
 
+void showHelp(){
+    std::cout << "\n***WELCOME TO MY SHELL'S HELP***"
+                 "\n-Use the shell at your own risk..."
+                 "\nList of Commands supported:"
+                 "\n>cd"
+                 "\n>ls"
+                 "\n>exit"
+                 "\n>all other general commands available in UNIX shell\n";
+}
+
 void execBuiltIn(std::vector<std::string> &parsedArgs){
     if(!parsedArgs[0].compare("cd")){
         if(parsedArgs.size() > 2){
@@ -71,6 +81,10 @@ void execBuiltIn(std::vector<std::string> &parsedArgs){
                 perror("cd");
             }
         }
+    } else if(!parsedArgs[0].compare("help") && !(parsedArgs.size() > 1)){
+        showHelp();
+    } else if(!parsedArgs[0].compare("exit") && !(parsedArgs.size() > 1)){
+        exit(0);
     }
 }
 
