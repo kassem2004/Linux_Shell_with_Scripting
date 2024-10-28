@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <sstream>
 #include <vector>
+#include <sys/wait.h>
 
 #define MAX_LETTERS 100
 #define MAX_COMMS 100
@@ -84,7 +85,23 @@ void execBuiltIn(std::vector<std::string> &parsedArgs){
     } else if(!parsedArgs[0].compare("help") && !(parsedArgs.size() > 1)){
         showHelp();
     } else if(!parsedArgs[0].compare("exit") && !(parsedArgs.size() > 1)){
+        sleep(1);
         exit(0);
+    }
+}
+
+void execSys(std::vector<std::string> &parsedArgs){
+    pid_t c_pid = fork(); 
+  
+    if (c_pid == -1) { 
+        perror("fork"); 
+        exit(EXIT_FAILURE); 
+    } else if (c_pid > 0) {  
+        wait(NULL);
+    } else {
+        char cwd[100];
+        getcwd(cwd, sizeof(cwd));
+        execlp(parsedArgs[0].c_str(), cwd, NULL); 
     }
 }
 
@@ -106,7 +123,7 @@ int main(){
             if(exec_flag == 0){
                 execBuiltIn(parsedArgs);
             } else if (exec_flag == 1){
-                //execSys(parsedArgs);
+                execSys(parsedArgs);
             } else {
                 //execPiped(parsedArgs);
             }
