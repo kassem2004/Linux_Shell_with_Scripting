@@ -91,7 +91,14 @@ void execBuiltIn(std::vector<std::string> &parsedArgs){
 }
 
 void execSys(std::vector<std::string> &parsedArgs){
-    pid_t c_pid = fork(); 
+    pid_t c_pid = fork();
+    int veclen = parsedArgs.size();
+    char *parsedParsedArgs[veclen];
+    for(int i = 0; i < veclen; i++){
+        parsedParsedArgs[i] = (char *)parsedArgs[i].c_str();
+    }
+
+    parsedParsedArgs[veclen] = NULL;
   
     if (c_pid == -1) { 
         perror("fork"); 
@@ -99,9 +106,8 @@ void execSys(std::vector<std::string> &parsedArgs){
     } else if (c_pid > 0) {  
         wait(NULL);
     } else {
-        char cwd[100];
-        getcwd(cwd, sizeof(cwd));
-        execlp(parsedArgs[0].c_str(), cwd, NULL); 
+        //USE EXECVP BECAUSE YOU NEED TO USE FIRST WORD, THEN REST OF WORD!!! COMMENTED TO REMIND MYSELF WHEN I COME BACK!
+        execvp(parsedArgs[0].c_str(), parsedParsedArgs); 
     }
 }
 
