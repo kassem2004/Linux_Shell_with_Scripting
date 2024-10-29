@@ -111,6 +111,76 @@ void execSys(std::vector<std::string> &parsedArgs){
     }
 }
 
+void execPiped(std::vector<std::string> &parsedArgs){
+    int veclen = parsedArgs.size();
+    int pipeIndex = -1;
+
+    for (int i = 0; i < veclen; i++) {
+        if (parsedArgs[i] == "|") {
+            pipeIndex = i;
+            break;
+        }
+    }
+
+    if (pipeIndex == -1) { //even though unlikely, just added protection incase something goes wrong
+        std::cerr << "No pipe '|' found in the input.\n";
+        return;
+    }
+
+    char *firstWordBeforePipe = (char *)parsedArgs[0].c_str();
+    int firstLenBeforePipe = pipeIndex;
+    char *remainingWordsBeforePipe[firstLenBeforePipe];
+
+    for (int i = 0; i < pipeIndex; i++) {
+        remainingWordsBeforePipe[i] = (char *)parsedArgs[i].c_str();
+    }
+    remainingWordsBeforePipe[firstLenBeforePipe] = nullptr;
+
+    char *firstWordAfterPipe = (char *)parsedArgs[pipeIndex + 1].c_str();
+    int secondLenAfterPipe = veclen - pipeIndex - 1;
+    char *remainingWordsAfterPipe[secondLenAfterPipe];
+
+    for (int i = pipeIndex + 1; i < veclen; i++) {
+        remainingWordsAfterPipe[i - pipeIndex - 1] = (char *)parsedArgs[i].c_str();
+    }
+    remainingWordsAfterPipe[secondLenAfterPipe] = nullptr;
+
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+    
+    pid_t child_a, child_b;
+
+    child_a = fork();
+
+    if (child_a == 0) {
+        /* Child A code */
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+        execvp(firstWordBeforePipe, remainingWordsBeforePipe);
+    } else {
+        child_b = fork();
+
+        if (child_b == 0) {
+            /* Child B code */
+            close(pipefd[1]);
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
+            execvp(firstWordAfterPipe, remainingWordsAfterPipe);
+        } else {
+            /* Parent Code */
+            close(pipefd[0]);
+            close(pipefd[1]);
+
+            waitpid(child_a, NULL, 0);
+            waitpid(child_b, NULL, 0);
+        }
+    }
+}
+
 int main(){
     std::string inputArgs;
     std::vector<std::string> parsedArgs;
@@ -120,18 +190,14 @@ int main(){
     while(1){
         printDir();
         if (takeUserInput(inputArgs)){
-            //std::cout << inputArgs << "\n"; //testing
             exec_flag = processInput(inputArgs, parsedArgs);
-            /*for (std::string &arg : parsedArgs) { //testing
-                std::cout << arg << "\n";
-            }*/
 
             if(exec_flag == 0){
                 execBuiltIn(parsedArgs);
             } else if (exec_flag == 1){
                 execSys(parsedArgs);
             } else {
-                //execPiped(parsedArgs);
+                execPiped(parsedArgs);
             }
 
             parsedArgs.clear();
