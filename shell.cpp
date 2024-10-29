@@ -111,7 +111,7 @@ void execSys(std::vector<std::string> &parsedArgs){
     }
 }
 
-void execPiped(std::vector<std::string> &parsedArgs){
+void execPiped(std::vector<std::string> &parsedArgs) {
     int veclen = parsedArgs.size();
     int pipeIndex = -1;
 
@@ -122,63 +122,73 @@ void execPiped(std::vector<std::string> &parsedArgs){
         }
     }
 
-    if (pipeIndex == -1) { //even though unlikely, just added protection incase something goes wrong
+    if (pipeIndex == -1) { 
         std::cerr << "No pipe '|' found in the input.\n";
         return;
     }
 
-    char *firstWordBeforePipe = (char *)parsedArgs[0].c_str();
-    int firstLenBeforePipe = pipeIndex;
-    char *remainingWordsBeforePipe[firstLenBeforePipe];
-
+    char **beforePipe = new char*[pipeIndex + 1];
     for (int i = 0; i < pipeIndex; i++) {
-        remainingWordsBeforePipe[i] = (char *)parsedArgs[i].c_str();
+        beforePipe[i] = strdup(parsedArgs[i].c_str());
     }
-    remainingWordsBeforePipe[firstLenBeforePipe] = nullptr;
+    beforePipe[pipeIndex] = nullptr; 
 
-    char *firstWordAfterPipe = (char *)parsedArgs[pipeIndex + 1].c_str();
-    int secondLenAfterPipe = veclen - pipeIndex - 1;
-    char *remainingWordsAfterPipe[secondLenAfterPipe];
-
+    char **remainingWordsAfterPipe = new char*[veclen - pipeIndex];
     for (int i = pipeIndex + 1; i < veclen; i++) {
-        remainingWordsAfterPipe[i - pipeIndex - 1] = (char *)parsedArgs[i].c_str();
+        remainingWordsAfterPipe[i - pipeIndex - 1] = strdup(parsedArgs[i].c_str()); 
     }
-    remainingWordsAfterPipe[secondLenAfterPipe] = nullptr;
+    remainingWordsAfterPipe[veclen - pipeIndex - 1] = nullptr; 
 
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         perror("pipe");
         exit(EXIT_FAILURE);
     }
-    
-    pid_t child_a, child_b;
 
-    child_a = fork();
+    pid_t child_a = fork();
 
-    if (child_a == 0) {
-        /* Child A code */
-        close(pipefd[0]);
-        dup2(pipefd[1], STDOUT_FILENO);
-        close(pipefd[1]);
-        execvp(firstWordBeforePipe, remainingWordsBeforePipe);
+    if (child_a == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } else if (child_a > 0) {
+        // Parent process
+        wait(NULL);
     } else {
-        child_b = fork();
-
-        if (child_b == 0) {
-            /* Child B code */
-            close(pipefd[1]);
-            dup2(pipefd[0], STDIN_FILENO);
-            close(pipefd[0]);
-            execvp(firstWordAfterPipe, remainingWordsAfterPipe);
-        } else {
-            /* Parent Code */
-            close(pipefd[0]);
-            close(pipefd[1]);
-
-            waitpid(child_a, NULL, 0);
-            waitpid(child_b, NULL, 0);
-        }
+        // Child A code
+        //close(pipefd[0]); 
+        //dup2(pipefd[1], STDOUT_FILENO);     
+        //close(pipefd[1]); 
+        std::cout << "Child A executing: " << beforePipe[0] << "\n";
+        execvp(beforePipe[0], beforePipe);
     }
+
+    /*pid_t child_b = fork();
+    
+    if (child_b == 0) {
+        // Child B code
+        close(pipefd[1]); // Close unused write end
+        dup2(pipefd[0], STDIN_FILENO); // Redirect stdin to pipe read end
+        close(pipefd[0]); // Close read end after dup
+
+        std::cout << "Child B executing: " << remainingWordsAfterPipe[0] << "\n";
+        execvp(remainingWordsAfterPipe[0], remainingWordsAfterPipe);
+        perror("execvp"); // If execvp returns, it must have failed
+        exit(EXIT_FAILURE);
+    }*/
+
+    // Parent code
+    //close(pipefd[0]);
+    //close(pipefd[1]);
+
+    for (int i = 0; i < pipeIndex; i++) {
+        free(beforePipe[i]);
+    }
+    delete[] beforePipe;
+
+    for (int i = 0; i < (veclen - pipeIndex - 1); i++) {
+        free(remainingWordsAfterPipe[i]);
+    }
+    delete[] remainingWordsAfterPipe;
 }
 
 int main(){
