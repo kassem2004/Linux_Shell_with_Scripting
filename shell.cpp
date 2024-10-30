@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <readline/history.h>
 #include <readline/readline.h>
+#include <fcntl.h>
 
 #define MAX_LETTERS 100
 #define MAX_COMMS 100
@@ -62,6 +63,15 @@ int isPiped(std::vector<std::string> &parsedArgs){
     return 0;
 }
 
+int isRedirected(std::vector<std::string> &parsedArgs){
+    for (std::string &arg : parsedArgs) { 
+        if(!arg.compare(">") || !arg.compare("<")){
+            return 1;
+        };
+    }
+    return 0;
+}
+
 int processInput(std::string &inputArgs, std::vector<std::string> &parsedArgs){
     //determines if built-in, system, or piped
     parseString(inputArgs, parsedArgs);
@@ -69,7 +79,9 @@ int processInput(std::string &inputArgs, std::vector<std::string> &parsedArgs){
         return 0;
     } else if (isPiped(parsedArgs)){
         return 2;
-    } 
+    } else if (isRedirected(parsedArgs)){
+        return 3;
+    }
     return 1;
 }
 
@@ -196,6 +208,55 @@ void execPiped(std::vector<std::string> &parsedArgs) {
     delete[] remainingWordsAfterPipe;
 }
 
+void execRedirect(std::vector<std::string> &parsedArgs){
+    int veclen = parsedArgs.size();
+    int redirectIndex = -1;
+    std::string redirectType;
+
+    for (int i = 0; i < veclen; i++) {
+        if (parsedArgs[i] == ">" || parsedArgs[i] == "<") {
+            redirectType = parsedArgs[i];
+            redirectIndex = i;
+            break;
+        }
+    }
+
+    char **beforeRedirect = new char*[redirectIndex + 1];
+    for (int i = 0; i < redirectIndex; i++) {
+        beforeRedirect[i] = strdup(parsedArgs[i].c_str());
+    }
+    beforeRedirect[redirectIndex] = nullptr; 
+
+    std::string filename = parsedArgs[redirectIndex + 1];
+    int redirect_fd;
+
+    pid_t child_a = fork();
+
+    if (child_a == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } else if (child_a > 0) {
+        // Parent process
+        waitpid(child_a, NULL, 0);
+    } else {
+        // Child A code
+        if(redirectType == ">"){
+            redirect_fd = open(filename.c_str(), O_CREAT | O_TRUNC); 
+            dup2(redirect_fd, STDOUT_FILENO);      
+        } else {
+            redirect_fd = open(filename.c_str(), O_RDONLY); 
+            dup2(redirect_fd, STDIN_FILENO);      
+        }
+        close(redirect_fd);
+        execvp(beforeRedirect[0], beforeRedirect);
+    }
+
+    for (int i = 0; i < redirectIndex; i++) {
+        free(beforeRedirect[i]);
+    }
+    delete[] beforeRedirect;
+}
+
 int main(){
     std::string inputArgs;
     std::vector<std::string> parsedArgs;
@@ -212,8 +273,10 @@ int main(){
                 execBuiltIn(parsedArgs);
             } else if (exec_flag == 1){
                 execSys(parsedArgs);
-            } else {
+            } else if (exec_flag == 2){
                 execPiped(parsedArgs);
+            } else if (exec_flag == 3){
+                execRedirect(parsedArgs);
             }
             parsedArgs.clear();
         }
