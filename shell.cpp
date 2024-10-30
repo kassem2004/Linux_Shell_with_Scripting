@@ -37,7 +37,7 @@ int takeUserInput(std::string &inputArgs, int count){
     //std::getline(std::cin, inputArgs);
     inputArgs = readline("\n>>>");
     if (!inputArgs.empty()) {
-        add_history(strdup(inputArgs.c_str()));
+        add_history(strdup(inputArgs.c_str())); //adds auto completion via 'tab' too
         return 1;
     }
     return 0;
