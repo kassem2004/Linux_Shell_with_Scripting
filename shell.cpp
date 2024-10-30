@@ -6,9 +6,13 @@
 #include <sstream>
 #include <vector>
 #include <sys/wait.h>
+#include <readline/history.h>
+#include <readline/readline.h>
 
 #define MAX_LETTERS 100
 #define MAX_COMMS 100
+
+//char *cmd_history[50];
 
 void init_shell() {
     std::cout << "\n******************************************";
@@ -24,10 +28,16 @@ void printDir(){
     std::cout << "Dir: " << cwd;
 }
 
-int takeUserInput(std::string &inputArgs){
-    std::cout << "\n>>>"; 
-    std::getline(std::cin, inputArgs);
+/*void add_his(char * arg, int count){
+    cmd_history[count] = arg;
+}*/
+
+int takeUserInput(std::string &inputArgs, int count){
+    //std::cout << "\n>>>"; 
+    //std::getline(std::cin, inputArgs);
+    inputArgs = readline("\n>>>");
     if (!inputArgs.empty()) {
+        add_history(strdup(inputArgs.c_str()));
         return 1;
     }
     return 0;
@@ -190,11 +200,12 @@ int main(){
     std::string inputArgs;
     std::vector<std::string> parsedArgs;
     int exec_flag = 0;
+    int count = 0;
     init_shell();
 
     while(1){
         printDir();
-        if (takeUserInput(inputArgs)){
+        if (takeUserInput(inputArgs, count)){
             exec_flag = processInput(inputArgs, parsedArgs);
 
             if(exec_flag == 0){
@@ -205,6 +216,10 @@ int main(){
                 execPiped(parsedArgs);
             }
             parsedArgs.clear();
+        }
+        count++;
+        if (count == 49){
+            count = 0;
         }
     }
 
