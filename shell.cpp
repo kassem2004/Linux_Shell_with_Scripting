@@ -9,11 +9,7 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <fcntl.h>
-
-#define MAX_LETTERS 100
-#define MAX_COMMS 100
-
-//char *cmd_history[50];
+#include <sys/stat.h>
 
 void init_shell() {
     std::cout << "\n******************************************";
@@ -28,10 +24,6 @@ void printDir(){
     getcwd(cwd, sizeof(cwd));
     std::cout << "Dir: " << cwd;
 }
-
-/*void add_his(char * arg, int count){
-    cmd_history[count] = arg;
-}*/
 
 int takeUserInput(std::string &inputArgs, int count){
     //std::cout << "\n>>>"; 
@@ -221,40 +213,51 @@ void execRedirect(std::vector<std::string> &parsedArgs){
         }
     }
 
-    char **beforeRedirect = new char*[redirectIndex + 1];
+    char **commands = new char*[redirectIndex + 1];
     for (int i = 0; i < redirectIndex; i++) {
-        beforeRedirect[i] = strdup(parsedArgs[i].c_str());
+        commands[i] = strdup(parsedArgs[i].c_str());
     }
-    beforeRedirect[redirectIndex] = nullptr; 
+    commands[redirectIndex] = nullptr;
 
-    std::string filename = parsedArgs[redirectIndex + 1];
-    int redirect_fd;
+    char * filename = strdup(parsedArgs[redirectIndex + 1].c_str());
 
-    pid_t child_a = fork();
+    //std::cout << "REDIRECTING!!!\n";
 
-    if (child_a == -1) {
+    pid_t c_pid = fork();
+
+    int file_fd;
+
+    if(c_pid == -1){
         perror("fork");
         exit(EXIT_FAILURE);
-    } else if (child_a > 0) {
-        // Parent process
-        waitpid(child_a, NULL, 0);
-    } else {
-        // Child A code
+    } else if(c_pid == 0){
         if(redirectType == ">"){
-            redirect_fd = open(filename.c_str(), O_CREAT | O_TRUNC); 
-            dup2(redirect_fd, STDOUT_FILENO);      
-        } else {
-            redirect_fd = open(filename.c_str(), O_RDONLY); 
-            dup2(redirect_fd, STDIN_FILENO);      
+            mode_t oldmask = umask(0);
+            file_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            umask(oldmask);
+            if (file_fd == -1) {
+                perror("open for output");
+                exit(EXIT_FAILURE);
+            }
+            dup2(file_fd, STDOUT_FILENO);
+            close(file_fd);
+        } else if(redirectType == "<"){
+            file_fd = open(filename, O_RDONLY);
+            if (file_fd == -1) {
+                perror("open for output");
+                exit(EXIT_FAILURE);
+            }
+            dup2(file_fd, STDIN_FILENO);
         }
-        close(redirect_fd);
-        execvp(beforeRedirect[0], beforeRedirect);
+        execvp(commands[0], commands);
+    } else {
+        waitpid(c_pid, NULL, 0);
     }
 
     for (int i = 0; i < redirectIndex; i++) {
-        free(beforeRedirect[i]);
+        free(commands[i]);
     }
-    delete[] beforeRedirect;
+    delete[] commands;
 }
 
 int main(){
